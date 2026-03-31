@@ -1,6 +1,8 @@
 {
   "baseline_cr": 0.05,
   "delta": 0.005,
+  "alpha": 0.05,
+  "power": 0.8,
   "treatment_cr": 0.055,
   "sample_size_per_group": 29826,
   "total_sample_size": 59652,

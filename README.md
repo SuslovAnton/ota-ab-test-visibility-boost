@@ -181,7 +181,7 @@ sessions_df = pd.DataFrame({
 })
 ```
 
-### Observed Results
+### Observed Results (Simulation Check)
 
 Results of the simulation:
 ```code
@@ -193,4 +193,102 @@ days                     14
 relative_lift            0.08883    
 ```
 
-Results fully comply with the conditions of A/B-test simulation.
+Results fully comply with the conditions of A/B-test simulation. Simulation raw data written to database's `analytics` schema: `analytics.ab_test_simulation_v1`.
+
+## 6. Statistical Testing
+
+Experiment metrics:
+- p_control = cr_control: Control group Conversion Rate.
+- p_treatment = cr_treatment: Treatment group Conversion Rate.
+- n_control = n_treatment = sample_size_per_group: Sample Size of Control and Treatment groups.   
+
+> **Goal:** reject or accept Null Hypothesis.   
+
+Analytical Notebook: [`03_analysis.ipynb`](notebooks/03_analysis.ipynb)
+
+### 6.1. Hypotheses
+
+```code
+H0 (null):          p_treatment  = p_control    (no effect)
+H1 (alternative):   p_treatment != p_control    (effect exists)
+```   
+
+### 6.2. Observed Metrics
+
+|**Group**|**Conversion Rate**|**Sample Size**|
+|:-|:-|:-|
+| **Control** | 0.0498 | 29826 |
+| **Treatment** | 0.0542 | 29826 |
+
+### 6.3. Analysis
+
+First, we get **Observed Difference (delta)**:   
+```python
+delta_observed = p_treatment - p_control
+delta_observed = 0.0542 - 0.0498 = 0.0044
+```
+
+### Statistical Significance
+
+Is delta of **0.0044** big enough compared to noise? It should be compared to **Standard Error (SE)**:   
+
+$$ SE = \sqrt{\text{p\_pool} \times (1 - \text{p\_pool}) \times (\frac{1}{\text{n\_control}} + \frac{1}{\text{n\_treatment}} )} $$
+
+where: `p_pool` - is **pooled conversion rate**:   
+
+$$ \text{p\_pool} = \frac{(\text{p\_control} \times \text{n\_control}) + (\text{p\_treatment} \times \text{n\_treatment})}{\text{n\_control} + \text{n\_treatment}} $$
+
+After that, we need **Z-score** (how many "noise units" (standard errors) away we are from 0) to finally get **p-value** and make a decision about **Statistical Significance** of observed results (delta).  
+
+$$ \text{Z-score} = \frac{\text{delta\_observed}}{se} $$
+
+How it looks in Python/Pandas:
+```python
+p_pool = (
+    exp_df['p'].sum()
+    / len(exp_df)
+)
+
+se = np.sqrt(
+    p_pool * (1 - p_pool)
+    * (1/n_control + 1/n_treatment)
+)
+
+z = delta_observed / se
+```
+
+**Result:** se = 0.0018, z-score = 2.43   
+
+Using `scipy.stats` library to get **p-value** for z-score:
+```python
+from scipy.stats import norm
+
+p_value = 2 * (1 - norm.cdf(abs(z)))
+```
+
+> **Result:** p-value = 0.015   
+
+At this point we have to make a decision about **statistical** significance of observed delta between conversion rates. To make, we $\alpha$ from test design input metrics ($\alpha = 0.05$) and compare it to **p-value**:
+
+| **Result** | **Meaning** |
+|:-|:-|
+| p < $\alpha$ | Observed uplift is statistically significant and unlikely due to random variation |
+| p $\geq$ $\alpha$ |effect is probably due to random variation |   
+
+**Decision**   
+
+0.015 < 0.05
+> **The observed difference 0.0044 (0.44%) is statistically significant.**  
+
+### Confidence Interval (CI)
+
+Here we calculate Confidence Interval (CI) for our Significance Level ($\alpha = 0.05$).  
+
+$$ CI = delta \pm \frac{Z\alpha}{2} \times SE $$
+
+**Results:** [0.09%, 0.79%]    
+
+### Statistical Interpretation
+
+The observed uplift of **+0.44%** is **statistically significant** (p_value = 0.015 < 0.05).   
+The **95% confidence interval [0.09%, 0.79%]** lies entirely above zero, what indicates a **robust positive effect** of the experiment.
