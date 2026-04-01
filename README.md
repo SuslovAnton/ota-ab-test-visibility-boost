@@ -5,7 +5,7 @@
 Thailand OTA market dynamics across main cities *(Bangkok, Chiang Mai, Krabi, Pattaya and Phuket)* were analyzed using the [Market Equilibrium and Drift (MED)](https://github.com/SuslovAnton/ota-market-equilibrium-and-drift) framework.   
 Results show that **Phuket** and **Krabi** are currently in a `PRICE_WAR` macro phase. However, RevPAR decline decomposition reveals that the drop is primarily `OCC_LED` (occupancy led) with ~90% occupancy contribution. That points towards `DEMAND_CRISIS` decline profile and a **demand-side problem** rather than pricing fault.    
 
-Therefore, an A/B-test was designed to evaluate if increasing property visibility can improve conversion rates in Phuket and Krabi markets, dragging **Occupancy** and **RevPAR** higher.
+Therefore, an A/B-test was designed to evaluate if increasing property visibility can improve **Conversion Rates (CR)** in Phuket and Krabi markets, dragging **Occupancy** and **RevPAR** higher.
 
 
 ## 2. Experiment Design Outlines
@@ -148,7 +148,7 @@ But, due to weekday vs weekend effect, noise and user behavior variability, it's
 
 ## 5. A/B-test Simulation
 
-Since there's no actual experiment behind the project, and `nomad_db` doesn't contain it's data, we **fake experimental data** that mimics Control group (no visibility boost) and Treatment group (visibility boost applied to get higher Conversion Rate).   
+Since there's no actual experiment behind the project, and `nomad_db` doesn't contain it's data, we **simulate experimental data** that mimics Control group (no visibility boost) and Treatment group (visibility boost applied to get higher Conversion Rate).   
 All the needed assumptions were introduced (or calculated) in step 4 "Pre-test Design and Calculations". 
 
 Simulation Notebook: [`02_simulation.ipynb`](notebooks/02_simulation.ipynb)   
@@ -230,7 +230,7 @@ delta_observed = 0.0542 - 0.0498 = 0.0044
 
 ### Statistical Significance
 
-Is delta of **0.0044** big enough compared to noise? It should be compared to **Standard Error (SE)**:   
+Is delta of **0.0044 (0.44 pp)** big enough compared to noise? It should be compared to **Standard Error (SE)**:   
 
 $$ SE = \sqrt{\text{p\_pool} \times (1 - \text{p\_pool}) \times (\frac{1}{\text{n\_control}} + \frac{1}{\text{n\_treatment}} )} $$
 
@@ -245,8 +245,8 @@ $$ \text{Z-score} = \frac{\text{delta\_observed}}{se} $$
 How it looks in Python/Pandas:
 ```python
 p_pool = (
-    exp_df['p'].sum()
-    / len(exp_df)
+    (p_control * n_control + p_treatment * n_treatment)
+    / (n_control + n_treatment)
 )
 
 se = np.sqrt(
@@ -286,9 +286,102 @@ Here we calculate Confidence Interval (CI) for our Significance Level ($\alpha =
 
 $$ CI = delta \pm \frac{Z\alpha}{2} \times SE $$
 
-**Results:** [0.09%, 0.79%]    
+**Results:** [0.09 pp ; 0.79 pp]    
 
 ### Statistical Interpretation
 
-The observed uplift of **+0.44%** is **statistically significant** (p_value = 0.015 < 0.05).   
-The **95% confidence interval [0.09%, 0.79%]** lies entirely above zero, what indicates a **robust positive effect** of the experiment.
+The observed uplift of **+0.44 pp** is **statistically significant** (p_value = 0.015 < 0.05).   
+The **95% confidence interval [0.09 pp ; 0.79 pp]** lies entirely above zero, which indicates a **robust positive effect** of the experiment.
+
+# 7. Business Interpretation
+
+## 7.1. Summary of the Experiment
+
+The goal of A/B-test was a **visibility boost** testing for the properties:
+- Location: Phuket, Krabi (Thailand)
+- Decline Profile: DEMAND_CRISIS   
+
+### Key outcomes:
+
+- **Absolute uplift:** +0.44 percentage points
+- **Relative uplift:** +8.8%
+- **Statistical significance:**
+    - p-value = 0.015 < 0.05: **significant**
+- **95% Confidence Interval (CI) of the Effect:**
+    - Absolute: **[+0.09 pp ; +0.79 pp]**
+    - Relative: **[+1.8% ; +15.9%]**
+
+### Visual Summary of Conversion Rate Uplift
+
+![A/B Test Results: Conversion Rate Comparison](/outputs/conversion_rates.png)   
+*Figure 1: Conversion rates with 95% confidence interval ($\alpha = 0.05$). Treatment shows +0.44pp absolute uplift (+8.8% relative). The confidence intervals partially overlap (control: [4.63%, 5.33%]; treatment: [5.07%, 5.77%]), but the p-value of 0.015 confirms statistical significance.*
+
+## 7.2. Interpretation of the Effect
+
+The experiment demonstrates a **statistically significant and positive impact** on Conversion Rate:
+- The entire confidence interval (CI) lies above zero, that means the effect is robust and not driven by noise.
+- Even the worst case scenario (CI Lower Band = +1.8%) the uplift is positive, what limits a downside risk.
+
+This strongly suggests that **visibility is a real bottleneck** in Phuket and Krabi, results are consistent with Thailand Market Equilibrium and Drift framework findings (`DEMAND_CRISIS`).
+
+## 7.3. Secondary Metric and Business Impact
+
+To evaluate revenue impact **RevPAR** was declared as a **Secondary Metric** of the testing. As was stated in **Step 5: A/B-test Simulation**, the only data was "collected" *(generated)* is sessions with conversions. Obviously, real experiment affects the whole performance, not only conversion rates, but occupancy, prices, cancellations, may lead to change in available units, and sure shifts aggregated metrics like ADR, RevPAR etc.   
+
+The best solution is to compare metrics at three layers: baseline (pre-test), control group, and treatment group. Adding the levels of aggregation, like city, market, country ensures most of the shifts inflicted by an experiment (see Step 3: Risk and Mitigation) will be detected.   
+
+For current experiment limitations too many assumptions are required for a complete in-depth Business Impact analysis. In real case we'd query the next raw level data:
+- grain:
+    - country
+    - city
+    - property
+- A/B-test boolean flags:
+    - control group
+    - treatment group
+- bookings fact data (period: 4-weeks prior test + test period):
+    - reservation date (created date)
+    - reservation_id
+    - price per night
+    - available units (total)
+    - commission rate
+    - booking status
+    - channel_id
+
+And then aggregate it for the needed levels (property, city, test-market vs other market, country, weekdays vs weekends etc) of metrics:
+- Conversion Rate
+- available units
+- booked units
+- Revenue
+- ADR
+- Occupancy
+- RevPAR
+- Cancellation Rate
+
+This data will allow to get insights about how **Visibility Boost** really affected the market:
+- We get positive CR uplift, but did we get Revenue and RevPAR positive uplift?
+- What happened with Commissions?
+- Did we observe overall Demand Increment (new users) or just shift between cities/properties?
+- Was effect concentrated around weekdays or weekends?
+- Did ADR shift?
+- Did Cancellation Rate increase (both: control and treatment groups)?
+
+After that, more efficient roll out can be achieved by smart segmentation. Regarding expected Business Impact, it can be calculated by applying metrics uplifts to roll out market.
+
+## 7.4. Risk Assessment
+
+Despite strong results, several risks must be monitored:   
+1. **Cannibalization.** Demand may shift to boosted properties from other ones. That means net market gain could be lower than observed uplifts.   
+**How to mitigate:** Monitor **total city bookings**, not only treated properties.   
+2. **Price shift (ADR risk)**. Increased visibility may stimulate discounting.   
+**How to mitigate:** Track **ADR stability.**   
+3. **Long-term sustainability:** Effect of visibility boost may (and will) decay over time.   
+**How to mitigate:** Post-launch monitoring.
+
+## 7.5. Final Decision
+
+> **ROLLOUT** on chosen segments.    
+
+### Steps
+1. **Gradual rollout**: start with the most promising segments. Expand if stable.
+2. **Post-launch monitoring**: Conversion rate, RevPAR, ADR, Cancellation Rate, Total bookings (anti-cannibalization).
+3. **Fine-tune:** optimize visibility boost activities.
