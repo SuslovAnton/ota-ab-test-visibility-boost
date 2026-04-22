@@ -232,11 +232,11 @@ delta_observed = 0.0542 - 0.0498 = 0.0044
 
 Is delta of **0.0044 (0.44 pp)** big enough compared to noise? It should be compared to **Standard Error (SE)**:   
 
-$$ SE = \sqrt{\text{p\_pool} \times (1 - \text{p\_pool}) \times (\frac{1}{\text{n\_control}} + \frac{1}{\text{n\_treatment}} )} $$
+$$` SE = \sqrt{\text{p\_pool} \times (1 - \text{p\_pool}) \times (\frac{1}{\text{n\_control}} + \frac{1}{\text{n\_treatment}} )} `$$
 
 where: `p_pool` - is **pooled conversion rate**:   
 
-$$ \text{p\_pool} = \frac{(\text{p\_control} \times \text{n\_control}) + (\text{p\_treatment} \times \text{n\_treatment})}{\text{n\_control} + \text{n\_treatment}} $$
+$` \text{p\_pool} = \frac{(\text{p\_control} \times \text{n\_control}) + (\text{p\_treatment} \times \text{n\_treatment})}{\text{n\_control} + \text{n\_treatment}} `$
 
 After that, we need **Z-score** (how many "noise units" (standard errors) away we are from 0) to finally get **p-value** and make a decision about **Statistical Significance** of observed results (delta).  
 
